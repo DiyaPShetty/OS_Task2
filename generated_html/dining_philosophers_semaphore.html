@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dining Philosophers Simulation</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f9;
+    color: #202938;
+    text-align: center;
+    padding: 20px;
+}
+.panel {
+    background: white;
+    max-width: 850px;
+    margin: 15px auto;
+    padding: 20px;
+    border-radius: 14px;
+    box-shadow: 0 3px 12px #0001;
+}
+#table {
+    width: 340px;
+    height: 340px;
+    position: relative;
+    margin: 15px auto;
+    border-radius: 50%;
+    background: #e8d9bf;
+    border: 12px solid #b99b72;
+}
+.philosopher, .fork {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    text-align: center;
+}
+.philosopher {
+    width: 85px;
+    height: 58px;
+    border-radius: 14px;
+    color: white;
+    font-size: 13px;
+    flex-direction: column;
+}
+.fork {
+    width: 54px;
+    height: 32px;
+    border-radius: 10px;
+    font-size: 12px;
+    background: #e1e5e9;
+    border: 2px solid #9aa3ae;
+}
+.Thinking { background: #64748b; }
+.Hungry, .Waiting { background: #d99a19; }
+.Eating { background: #26834d; }
+.Releasing { background: #3578bc; }
+
+button {
+    padding: 10px 18px;
+    margin: 5px;
+    border: 0;
+    border-radius: 8px;
+    background: #315b91;
+    color: white;
+    cursor: pointer;
+}
+#timeline {
+    text-align: left;
+    max-height: 220px;
+    overflow-y: auto;
+}
+li { margin: 7px 0; }
+</style>
+</head>
+
+<body>
+<h1>Dining Philosophers Problem</h1>
+<p>Semaphore + FIFO Queue | 4 Philosophers</p>
+
+<div class="panel">
+    <div id="table">
+        <div class="philosopher" id="p0"
+             style="left:50%;top:8%">P0</div>
+        <div class="philosopher" id="p1"
+             style="left:92%;top:50%">P1</div>
+        <div class="philosopher" id="p2"
+             style="left:50%;top:92%">P2</div>
+        <div class="philosopher" id="p3"
+             style="left:8%;top:50%">P3</div>
+
+        <div class="fork" id="f0"
+             style="left:75%;top:23%">F0</div>
+        <div class="fork" id="f1"
+             style="left:75%;top:77%">F1</div>
+        <div class="fork" id="f2"
+             style="left:25%;top:77%">F2</div>
+        <div class="fork" id="f3"
+             style="left:25%;top:23%">F3</div>
+    </div>
+
+    <div id="event">Ready to start</div>
+
+    <button onclick="play()">▶ Play</button>
+    <button onclick="pause()">⏸ Pause</button>
+    <button onclick="reset()">↺ Reset</button>
+
+    <p>
+        Speed:
+        <input id="speed" type="range"
+               min="200" max="2000" value="900" step="100">
+    </p>
+
+    <p id="counter"></p>
+</div>
+
+<div class="panel">
+    <h2>Current States</h2>
+    <div id="states"></div>
+    <h2>Waiting Queue</h2>
+    <div id="queue"></div>
+</div>
+
+<div class="panel">
+    <h2>Execution Timeline</h2>
+    <ol id="timeline"></ol>
+</div>
+
+<script>
+const events = [{"message":"Philosopher 0 is thinking","states":["Thinking","Thinking","Thinking","Thinking"],"owners":[-1,-1,-1,-1],"queue":[]},{"message":"Philosopher 2 is thinking","states":["Thinking","Thinking","Thinking","Thinking"],"owners":[-1,-1,-1,-1],"queue":[]},{"message":"Philosopher 1 is thinking","states":["Thinking","Thinking","Thinking","Thinking"],"owners":[-1,-1,-1,-1],"queue":[]},{"message":"Philosopher 3 is thinking","states":["Thinking","Thinking","Thinking","Thinking"],"owners":[-1,-1,-1,-1],"queue":[]},{"message":"Philosopher 1 is hungry and joins the queue","states":["Thinking","Hungry","Thinking","Thinking"],"owners":[-1,-1,-1,-1],"queue":[1]},{"message":"Philosopher 1 acquired both chopsticks and is eating","states":["Thinking","Eating","Thinking","Thinking"],"owners":[-1,1,1,-1],"queue":[]},{"message":"Philosopher 3 is hungry and joins the queue","states":["Thinking","Eating","Thinking","Hungry"],"owners":[-1,1,1,-1],"queue":[3]},{"message":"Philosopher 3 acquired both chopsticks and is eating","states":["Thinking","Eating","Thinking","Eating"],"owners":[3,1,1,3],"queue":[]},{"message":"Philosopher 2 is hungry and joins the queue","states":["Thinking","Eating","Hungry","Eating"],"owners":[3,1,1,3],"queue":[2]},{"message":"Philosopher 0 is hungry and joins the queue","states":["Hungry","Eating","Hungry","Eating"],"owners":[3,1,1,3],"queue":[2,0]},{"message":"Philosopher 3 is releasing chopsticks","states":["Hungry","Eating","Hungry","Releasing"],"owners":[3,1,1,3],"queue":[2,0]},{"message":"Philosopher 3 finished eating","states":["Hungry","Eating","Hungry","Thinking"],"owners":[-1,1,1,-1],"queue":[2,0]},{"message":"Philosopher 1 is releasing chopsticks","states":["Hungry","Releasing","Hungry","Thinking"],"owners":[-1,1,1,-1],"queue":[2,0]},{"message":"Philosopher 1 finished eating","states":["Hungry","Thinking","Hungry","Thinking"],"owners":[-1,-1,-1,-1],"queue":[2,0]},{"message":"Philosopher 2 acquired both chopsticks and is eating","states":["Hungry","Thinking","Eating","Thinking"],"owners":[-1,-1,2,2],"queue":[0]},{"message":"Philosopher 3 is thinking","states":["Hungry","Thinking","Eating","Thinking"],"owners":[-1,-1,2,2],"queue":[0]},{"message":"Philosopher 1 is thinking","states":["Hungry","Thinking","Eating","Thinking"],"owners":[-1,-1,2,2],"queue":[0]},{"message":"Philosopher 1 is hungry and joins the queue","states":["Hungry","Hungry","Eating","Thinking"],"owners":[-1,-1,2,2],"queue":[0,1]},{"message":"Philosopher 0 acquired both chopsticks and is eating","states":["Eating","Hungry","Eating","Thinking"],"owners":[0,0,2,2],"queue":[1]},{"message":"Philosopher 3 is hungry and joins the queue","states":["Eating","Hungry","Eating","Hungry"],"owners":[0,0,2,2],"queue":[1,3]},{"message":"Philosopher 2 is releasing chopsticks","states":["Eating","Hungry","Releasing","Hungry"],"owners":[0,0,2,2],"queue":[1,3]},{"message":"Philosopher 2 finished eating","states":["Eating","Hungry","Thinking","Hungry"],"owners":[0,0,-1,-1],"queue":[1,3]},{"message":"Philosopher 2 is thinking","states":["Eating","Hungry","Thinking","Hungry"],"owners":[0,0,-1,-1],"queue":[1,3]},{"message":"Philosopher 2 is hungry and joins the queue","states":["Eating","Hungry","Hungry","Hungry"],"owners":[0,0,-1,-1],"queue":[1,3,2]},{"message":"Philosopher 0 is releasing chopsticks","states":["Releasing","Hungry","Hungry","Hungry"],"owners":[0,0,-1,-1],"queue":[1,3,2]},{"message":"Philosopher 0 finished eating","states":["Thinking","Hungry","Hungry","Hungry"],"owners":[-1,-1,-1,-1],"queue":[1,3,2]},{"message":"Philosopher 1 acquired both chopsticks and is eating","states":["Thinking","Eating","Hungry","Hungry"],"owners":[-1,1,1,-1],"queue":[3,2]},{"message":"Philosopher 0 is thinking","states":["Thinking","Eating","Hungry","Hungry"],"owners":[-1,1,1,-1],"queue":[3,2]},{"message":"Philosopher 0 is hungry and joins the queue","states":["Hungry","Eating","Hungry","Hungry"],"owners":[-1,1,1,-1],"queue":[3,2,0]},{"message":"Philosopher 3 acquired both chopsticks and is eating","states":["Hungry","Eating","Hungry","Eating"],"owners":[3,1,1,3],"queue":[2,0]},{"message":"Philosopher 1 is releasing chopsticks","states":["Hungry","Releasing","Hungry","Eating"],"owners":[3,1,1,3],"queue":[2,0]},{"message":"Philosopher 1 finished eating","states":["Hungry","Thinking","Hungry","Eating"],"owners":[3,-1,-1,3],"queue":[2,0]},{"message":"Philosopher 1 is thinking","states":["Hungry","Thinking","Hungry","Eating"],"owners":[3,-1,-1,3],"queue":[2,0]},{"message":"Philosopher 1 is hungry and joins the queue","states":["Hungry","Hungry","Hungry","Eating"],"owners":[3,-1,-1,3],"queue":[2,0,1]},{"message":"Philosopher 3 is releasing chopsticks","states":["Hungry","Hungry","Hungry","Releasing"],"owners":[3,-1,-1,3],"queue":[2,0,1]},{"message":"Philosopher 3 finished eating","states":["Hungry","Hungry","Hungry","Thinking"],"owners":[-1,-1,-1,-1],"queue":[2,0,1]},{"message":"Philosopher 2 acquired both chopsticks and is eating","states":["Hungry","Hungry","Eating","Thinking"],"owners":[-1,-1,2,2],"queue":[0,1]},{"message":"Philosopher 3 is thinking","states":["Hungry","Hungry","Eating","Thinking"],"owners":[-1,-1,2,2],"queue":[0,1]},{"message":"Philosopher 3 is hungry and joins the queue","states":["Hungry","Hungry","Eating","Hungry"],"owners":[-1,-1,2,2],"queue":[0,1,3]},{"message":"Philosopher 0 acquired both chopsticks and is eating","states":["Eating","Hungry","Eating","Hungry"],"owners":[0,0,2,2],"queue":[1,3]},{"message":"Philosopher 2 is releasing chopsticks","states":["Eating","Hungry","Releasing","Hungry"],"owners":[0,0,2,2],"queue":[1,3]},{"message":"Philosopher 2 finished eating","states":["Eating","Hungry","Thinking","Hungry"],"owners":[0,0,-1,-1],"queue":[1,3]},{"message":"Philosopher 2 is thinking","states":["Eating","Hungry","Thinking","Hungry"],"owners":[0,0,-1,-1],"queue":[1,3]},{"message":"Philosopher 2 is hungry and joins the queue","states":["Eating","Hungry","Hungry","Hungry"],"owners":[0,0,-1,-1],"queue":[1,3,2]},{"message":"Philosopher 0 is releasing chopsticks","states":["Releasing","Hungry","Hungry","Hungry"],"owners":[0,0,-1,-1],"queue":[1,3,2]},{"message":"Philosopher 0 finished eating","states":["Thinking","Hungry","Hungry","Hungry"],"owners":[-1,-1,-1,-1],"queue":[1,3,2]},{"message":"Philosopher 1 acquired both chopsticks and is eating","states":["Thinking","Eating","Hungry","Hungry"],"owners":[-1,1,1,-1],"queue":[3,2]},{"message":"Philosopher 0 is thinking","states":["Thinking","Eating","Hungry","Hungry"],"owners":[-1,1,1,-1],"queue":[3,2]},{"message":"Philosopher 0 is hungry and joins the queue","states":["Hungry","Eating","Hungry","Hungry"],"owners":[-1,1,1,-1],"queue":[3,2,0]},{"message":"Philosopher 3 acquired both chopsticks and is eating","states":["Hungry","Eating","Hungry","Eating"],"owners":[3,1,1,3],"queue":[2,0]},{"message":"Philosopher 1 is releasing chopsticks","states":["Hungry","Releasing","Hungry","Eating"],"owners":[3,1,1,3],"queue":[2,0]},{"message":"Philosopher 1 finished eating","states":["Hungry","Thinking","Hungry","Eating"],"owners":[3,-1,-1,3],"queue":[2,0]},{"message":"Philosopher 3 is releasing chopsticks","states":["Hungry","Thinking","Hungry","Releasing"],"owners":[3,-1,-1,3],"queue":[2,0]},{"message":"Philosopher 3 finished eating","states":["Hungry","Thinking","Hungry","Thinking"],"owners":[-1,-1,-1,-1],"queue":[2,0]},{"message":"Philosopher 2 acquired both chopsticks and is eating","states":["Hungry","Thinking","Eating","Thinking"],"owners":[-1,-1,2,2],"queue":[0]},{"message":"Philosopher 2 is releasing chopsticks","states":["Hungry","Thinking","Releasing","Thinking"],"owners":[-1,-1,2,2],"queue":[0]},{"message":"Philosopher 2 finished eating","states":["Hungry","Thinking","Thinking","Thinking"],"owners":[-1,-1,-1,-1],"queue":[0]},{"message":"Philosopher 0 acquired both chopsticks and is eating","states":["Eating","Thinking","Thinking","Thinking"],"owners":[0,0,-1,-1],"queue":[]},{"message":"Philosopher 0 is releasing chopsticks","states":["Releasing","Thinking","Thinking","Thinking"],"owners":[0,0,-1,-1],"queue":[]},{"message":"Philosopher 0 finished eating","states":["Thinking","Thinking","Thinking","Thinking"],"owners":[-1,-1,-1,-1],"queue":[]}];
+let index = 0;
+let timer = null;
+
+function render() {
+    if (index >= events.length) {
+        pause();
+        return;
+    }
+
+    const e = events[index];
+
+    for (let i = 0; i < 4; i++) {
+        const p = document.getElementById("p" + i);
+        p.className = "philosopher " + e.states[i];
+        p.innerHTML = "P" + i + "<br>" + e.states[i];
+
+        const f = document.getElementById("f" + i);
+
+        if (e.owners[i] === -1) {
+            f.style.background = "#e1e5e9";
+            f.style.color = "#202938";
+            f.innerHTML = "F" + i + "<br>Free";
+        } else {
+            f.style.background = "#26834d";
+            f.style.color = "white";
+            f.innerHTML = "F" + i + "<br>P" + e.owners[i];
+        }
+    }
+
+    document.getElementById("event").textContent = e.message;
+    document.getElementById("counter").textContent =
+        "Event " + (index + 1) + " of " + events.length;
+
+    document.getElementById("states").textContent =
+        e.states.map((s, i) => "P" + i + ": " + s).join(" | ");
+
+    document.getElementById("queue").textContent =
+        e.queue.length
+            ? e.queue.map(x => "P" + x).join(" → ")
+            : "Empty";
+
+    const li = document.createElement("li");
+    li.textContent = e.message;
+    document.getElementById("timeline").appendChild(li);
+    li.scrollIntoView({block: "nearest"});
+
+    index++;
+}
+
+function play() {
+    if (timer !== null || index >= events.length) return;
+
+    render();
+
+    timer = setInterval(() => {
+        if (index >= events.length) {
+            pause();
+        } else {
+            render();
+        }
+    }, Number(document.getElementById("speed").value));
+}
+
+function pause() {
+    if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+    }
+}
+
+function reset() {
+    pause();
+    index = 0;
+
+    document.getElementById("timeline").innerHTML = "";
+    document.getElementById("event").textContent = "Ready to start";
+    document.getElementById("counter").textContent = "";
+    document.getElementById("states").textContent = "";
+    document.getElementById("queue").textContent = "";
+
+    for (let i = 0; i < 4; i++) {
+        const p = document.getElementById("p" + i);
+        p.className = "philosopher Thinking";
+        p.innerHTML = "P" + i + "<br>Thinking";
+
+        const f = document.getElementById("f" + i);
+        f.style.background = "#e1e5e9";
+        f.style.color = "#202938";
+        f.innerHTML = "F" + i + "<br>Free";
+    }
+}
+
+reset();
+</script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Readers-Writers Semaphore</title>
+<style>
+body {
+    font-family: Arial;
+    text-align: center;
+    background: #f2f5f9;
+}
+.container {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    flex-wrap: wrap;
+    margin: 25px;
+}
+.group {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    min-width: 250px;
+}
+.person {
+    margin: 10px;
+    padding: 12px;
+    border-radius: 8px;
+    background: #ddd;
+}
+.Waiting { background: #ffe08a; }
+.Reading { background: #a8d5f5; }
+.Writing { background: #91dfa7; }
+.Finished { background: #ddd; }
+#resource {
+    border: 3px solid #555;
+    padding: 20px;
+    margin: 20px auto;
+    width: 250px;
+    border-radius: 12px;
+    background: white;
+}
+#timeline {
+    max-width: 750px;
+    max-height: 250px;
+    overflow-y: auto;
+    text-align: left;
+    background: white;
+    padding: 15px;
+    margin: 20px auto;
+}
+button { padding: 9px 18px; margin: 5px; }
+</style>
+</head>
+<body>
+<h2>Readers-Writers - Semaphore Simulation</h2>
+
+<div class="container">
+    <div class="group">
+        <h3>Readers</h3>
+        <div id="readers"></div>
+    </div>
+    <div class="group">
+        <h3>Writers</h3>
+        <div id="writers"></div>
+    </div>
+</div>
+
+<div id="resource">
+    <h3>Shared Resource</h3>
+    <p id="resourceStatus">Available</p>
+    <p id="dataValue">Data: 0</p>
+    <p id="readerCount">Active readers: 0</p>
+</div>
+
+<h3 id="message">Ready</h3>
+<button onclick="play()">Play</button>
+<button onclick="pause()">Pause</button>
+<button onclick="reset()">Reset</button>
+<br><br>
+<label>Speed</label>
+<input type="range" id="speed"
+       min="200" max="2000" value="900" step="100">
+
+<h3>Execution Timeline</h3>
+<div id="timeline"></div>
+
+<script>
+const events = [{"message":"Reader 3 is waiting","readers":["Waiting","Waiting","Waiting","Waiting"],"writers":["Waiting","Waiting"],"readCount":0,"writerActive":false,"data":0},{"message":"Reader 2 is waiting","readers":["Waiting","Waiting","Waiting","Waiting"],"writers":["Waiting","Waiting"],"readCount":0,"writerActive":false,"data":0},{"message":"Reader 1 is waiting","readers":["Waiting","Waiting","Waiting","Reading"],"writers":["Waiting","Waiting"],"readCount":1,"writerActive":false,"data":0},{"message":"Reader 0 is waiting","readers":["Waiting","Waiting","Waiting","Reading"],"writers":["Waiting","Waiting"],"readCount":1,"writerActive":false,"data":0},{"message":"Writer 1 is waiting","readers":["Waiting","Waiting","Waiting","Reading"],"writers":["Waiting","Waiting"],"readCount":1,"writerActive":false,"data":0},{"message":"Writer 0 is waiting","readers":["Waiting","Waiting","Waiting","Reading"],"writers":["Waiting","Waiting"],"readCount":1,"writerActive":false,"data":0},{"message":"Reader 3 starts reading","readers":["Waiting","Waiting","Waiting","Reading"],"writers":["Waiting","Waiting"],"readCount":1,"writerActive":false,"data":0},{"message":"Reader 0 starts reading","readers":["Reading","Waiting","Waiting","Reading"],"writers":["Waiting","Waiting"],"readCount":2,"writerActive":false,"data":0},{"message":"Reader 1 starts reading","readers":["Reading","Reading","Waiting","Reading"],"writers":["Waiting","Waiting"],"readCount":3,"writerActive":false,"data":0},{"message":"Reader 2 starts reading","readers":["Reading","Reading","Reading","Reading"],"writers":["Waiting","Waiting"],"readCount":4,"writerActive":false,"data":0},{"message":"Reader 0 finishes reading","readers":["Finished","Reading","Reading","Reading"],"writers":["Waiting","Waiting"],"readCount":3,"writerActive":false,"data":0},{"message":"Reader 2 finishes reading","readers":["Finished","Reading","Finished","Reading"],"writers":["Waiting","Waiting"],"readCount":2,"writerActive":false,"data":0},{"message":"Reader 3 finishes reading","readers":["Finished","Reading","Finished","Finished"],"writers":["Waiting","Waiting"],"readCount":1,"writerActive":false,"data":0},{"message":"Reader 1 finishes reading","readers":["Finished","Finished","Finished","Finished"],"writers":["Waiting","Waiting"],"readCount":0,"writerActive":false,"data":0},{"message":"Writer 1 starts writing","readers":["Finished","Finished","Finished","Finished"],"writers":["Waiting","Writing"],"readCount":0,"writerActive":true,"data":0},{"message":"Writer 1 finishes writing","readers":["Finished","Finished","Finished","Finished"],"writers":["Waiting","Finished"],"readCount":0,"writerActive":false,"data":1},{"message":"Writer 0 starts writing","readers":["Finished","Finished","Finished","Finished"],"writers":["Writing","Finished"],"readCount":0,"writerActive":true,"data":1},{"message":"Writer 0 finishes writing","readers":["Finished","Finished","Finished","Finished"],"writers":["Finished","Finished"],"readCount":0,"writerActive":false,"data":2}];
+let index = 0;
+let timer = null;
+
+function renderPeople(containerId, states, prefix) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+
+    states.forEach((state, i) => {
+        const div = document.createElement("div");
+        div.className = "person " + state;
+        div.textContent = prefix + i + ": " + state;
+        container.appendChild(div);
+    });
+}
+
+function showEvent(i) {
+    const e = events[i];
+
+    document.getElementById("message").textContent =
+        e.message;
+
+    renderPeople("readers", e.readers, "Reader ");
+    renderPeople("writers", e.writers, "Writer ");
+
+    document.getElementById("resourceStatus").textContent =
+        e.writerActive ? "Writer is writing" :
+        e.readCount > 0 ? "Readers are reading" : "Available";
+
+    document.getElementById("dataValue").textContent =
+        "Data: " + e.data;
+
+    document.getElementById("readerCount").textContent =
+        "Active readers: " + e.readCount;
+
+    document.getElementById("timeline").innerHTML =
+        events.slice(0, i + 1)
+        .map((event, n) =>
+            (n + 1) + ". " + event.message
+        ).join("<br>");
+}
+
+function play() {
+    if (timer !== null) return;
+
+    timer = setInterval(() => {
+        if (index >= events.length) {
+            pause();
+            return;
+        }
+        showEvent(index++);
+    }, Number(document.getElementById("speed").value));
+}
+
+function pause() {
+    clearInterval(timer);
+    timer = null;
+}
+
+function reset() {
+    pause();
+    index = 0;
+    showEvent(0);
+}
+
+showEvent(0);
+</script>
+</body>
+</html>
